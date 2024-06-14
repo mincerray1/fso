@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import phonebookService from './services/phonebook'
 
 const Filter = (props) => {
 	return (
@@ -25,23 +26,35 @@ const PersonForm = (props) => {
 	)
 }
 
-const Persons = ({persons}) => {
+const Persons = ({persons, handleDeleteOf}) => {
 	return (
 		<div>
 			{
 				persons.map(person => 
-					<PersonDetail key={person.name} person={person}/>
+					<PersonDetail key={person.name} person={person} handleDelete={() => handleDeleteOf(person.id, person.name)}/>
 				)
 			}
 		</div>
 	)
 }
 
-const PersonDetail = ({person}) => {
+const PersonDetail = ({person, handleDelete}) => {
 	return (
-		<>
-			<div>{person.name}: {person.number}</div>
-		</>
+			<div>
+				{person.name}: {person.number} <button onClick={handleDelete}>delete</button>
+			</div>
+	)
+}
+
+const Notification = ({ message, notificationType }) => {
+	if (message === null) {
+		return null
+	}
+
+	return (
+		<div className={notificationType}>
+			{message}
+		</div>
 	)
 }
 
@@ -50,34 +63,55 @@ const App = () => {
   const [newName, setNewName] = useState('')
   const [newNumber, setNumber] = useState('')
   const [filter, setFilter] = useState('')
+	const [notificationMessage, setNotificationMessage] = useState(null)
+	const [notificationType, setNotificationType] = useState("success")
 
 	useEffect(() => {
 		console.log('effect')
-		axios
-			.get('http://localhost:3001/persons')
-			.then(response => {
-				console.log('promise fulfilled')
-				setPersons(response.data)
+		phonebookService.getAll()
+			.then(initialPhonebook => {
+				setPersons(initialPhonebook)
 			})
 	}, [])
 
 	const addPerson = (event) => {
 		event.preventDefault()
 
-		const found = persons.find((element) => element.name == newName)
-
-		if (found) {
-			alert(`${newName} is already added to phonebook`)
-		}
-		else {
-			const personObject = {
-				name: newName,
-				number: newNumber,
-			}
-			setPersons(persons.concat(personObject))
-			setNewName('')
-			setNumber('')
-		}
+		phonebookService
+			.find(newName)
+			.then(found => {
+				if (found) {
+					if (confirm(`${newName} is already added to phonebook, replace the old number with a new one?`)) {
+						const changedPerson = {
+							...found, 
+							number: newNumber,
+						}
+	
+						phonebookService
+							.update(found.id, changedPerson)
+							.then(returnedPerson => {
+								setNotification(`Updated '${returnedPerson.name}'`, "success")
+								setPersons(persons.map(p => p.id !== found.id ? p : returnedPerson))
+								setNewName('')
+								setNumber('')
+							})
+					}
+				}
+				else {
+					const personObject = {
+						name: newName,
+						number: newNumber,
+					}
+					phonebookService
+						.create(personObject)
+						.then(returnedPerson => {
+							setNotification(`Added '${returnedPerson.name}'`, "success")
+							setPersons(persons.concat(returnedPerson))
+							setNewName('')
+							setNumber('')
+						})
+				}
+			})
 	}
 
 	const handleNameChange = (event) => {
@@ -92,11 +126,34 @@ const App = () => {
 		setFilter(event.target.value)
 	}
 
+	const handleDeleteOf = (id, name) => {
+		phonebookService
+			.remove(id)
+			.then(() => {
+				setNotification(`Deleted ${name} successfully`, "success")
+				setPersons(persons.filter(person => person.id !== id))
+			})
+			.catch(() => {
+				setNotification(`the person ${name} was already deleted from the server`, "error")
+				setPersons(persons.filter(person => person.id !== id))
+			})
+	}
+
+	const setNotification = (message, type) => {
+		setNotificationType(type)
+		setNotificationMessage(message)
+
+		setTimeout(() => {
+			setNotificationMessage(null)
+		}, 2000)
+	}
+
 	const personsToShow = persons.filter(person => person.name.toLocaleLowerCase().includes(filter.toLocaleLowerCase()))
 	console.log(personsToShow)
   return (
     <div>
-      <h2>Phonebook</h2>
+      <h1>Phonebook</h1>
+			<Notification message={notificationMessage} notificationType={notificationType}/>
 			<div>
         <Filter handleFilterChange={handleFilterChange} filter={filter} />
 			</div>
@@ -109,7 +166,7 @@ const App = () => {
 					newNumber={newNumber}
 					/>
       <h2>Numbers</h2>
-      <Persons persons={personsToShow}/>
+      <Persons persons={personsToShow} handleDeleteOf={handleDeleteOf}/>
     </div>
   )
 }
