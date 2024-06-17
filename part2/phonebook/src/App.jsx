@@ -75,10 +75,10 @@ const App = () => {
 
 	const addPerson = (event) => {
 		event.preventDefault()
-
 		phonebookService
 			.find(newName)
 			.then(found => {
+				console.log('found', found)
 				if (found) {
 					if (confirm(`${newName} is already added to phonebook, replace the old number with a new one?`)) {
 						const changedPerson = {
@@ -93,6 +93,10 @@ const App = () => {
 								setPersons(persons.map(p => p.id !== found.id ? p : returnedPerson))
 								setNewName('')
 								setNumber('')
+							})
+							.catch(error => {
+								setNotification(error.response.data.error, "error")
+								// setNotification(error.error, "error")
 							})
 					}
 				}
@@ -109,7 +113,14 @@ const App = () => {
 							setNewName('')
 							setNumber('')
 						})
+						.catch(error => {
+							setNotification(error.response.data.error, "error")
+							// setNotification(error.error, "error")
+						})
 				}
+			}).catch(error => {
+				setNotification(error.response.data.error, "error")
+				// setNotification(error.error, "error")
 			})
 	}
 

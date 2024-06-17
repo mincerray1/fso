@@ -22,11 +22,8 @@ const remove = (id) => {
 }
 
 const find = (name) => {
-	const request = axios.get(baseUrl)
-	return request.then(response => {
-		const found = response.data.find((element) => element.name == name)
-		return found
-	})
+	const request = axios.get(`${baseUrl}?name=${name}`)
+  return request.then(response => response.data)
 }
 
 export default { getAll, create, update, remove, find }
